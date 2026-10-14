@@ -1,6 +1,5 @@
 import type {
 	IAuthenticateGeneric,
-	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
 } from 'n8n-workflow';
@@ -33,10 +32,10 @@ export class ExecutionTagsApi implements ICredentialType {
 			displayName: 'Base URL',
 			name: 'baseUrl',
 			type: 'string',
-			default: 'http://localhost:5678/api/v1',
+			default: '',
 			placeholder: 'https://your-n8n-host/api/v1',
 			description:
-				'URL of your n8n instance. "/api/v1" is appended automatically if it is missing.',
+				'Leave empty to use this n8n instance. To use another instance, enter its URL; "/api/v1" is appended automatically if it is missing.',
 		},
 	];
 
@@ -44,15 +43,6 @@ export class ExecutionTagsApi implements ICredentialType {
 		type: 'generic',
 		properties: {
 			headers: { 'X-N8N-API-KEY': '={{$credentials.apiKey}}' },
-		},
-	};
-
-	test: ICredentialTestRequest = {
-		request: {
-			baseURL:
-				"={{$credentials.baseUrl.replace(/\\/+$/, '').replace(/\\/api\\/v1$/, '') + '/api/v1'}}",
-			url: '/executions',
-			qs: { limit: 1 },
 		},
 	};
 }

@@ -1,8 +1,11 @@
 import {
+	ICredentialsDecrypted,
+	ICredentialTestFunctions,
 	IDataObject,
 	IExecuteFunctions,
 	IHttpRequestOptions,
 	JsonObject,
+	INodeCredentialTestResult,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
@@ -26,7 +29,7 @@ export class ExecutionTags implements INodeType {
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		// Own credential: n8n public API key + Base URL (must end with /api/v1)
-		credentials: [{ name: 'executionTagsApi', required: true }],
+		credentials: [{ name: 'executionTagsApi', required: true, testedBy: 'executionTagsApiTest' }],
 		properties: [
 			{
 				displayName: 'Operation',
@@ -63,14 +66,48 @@ export class ExecutionTags implements INodeType {
 		usableAsTool: true,
 	};
 
+	methods = {
+		credentialTest: {
+			async executionTagsApiTest(
+				this: ICredentialTestFunctions,
+				credential: ICredentialsDecrypted,
+			): Promise<INodeCredentialTestResult> {
+				const data = credential.data ?? {};
+				const rawUrl = String(data.baseUrl ?? '').trim();
+				if (!rawUrl) {
+					return {
+						status: 'OK',
+						message:
+							'Base URL is empty: the URL of this n8n instance will be used when the node runs (connection not tested)',
+					};
+				}
+				const baseUrl = `${rawUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')}/api/v1`;
+				try {
+					// ICredentialTestFunctions only exposes the legacy `request` helper
+					// eslint-disable-next-line @n8n/community-nodes/no-deprecated-workflow-functions
+					await this.helpers.request({
+						method: 'GET',
+						url: `${baseUrl}/executions`,
+						qs: { limit: 1 },
+						headers: { 'X-N8N-API-KEY': String(data.apiKey ?? '') },
+						json: true,
+					});
+					return { status: 'OK', message: 'Connection tested successfully' };
+				} catch (error) {
+					return { status: 'Error', message: (error as Error).message };
+				}
+			},
+		},
+	};
+
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
 		const credentials = await this.getCredentials('executionTagsApi');
-		const baseUrl = `${String(credentials.baseUrl)
-			.replace(/\/+$/, '')
-			.replace(/\/api\/v1$/, '')}/api/v1`;
+		// Empty Base URL means "this n8n instance"
+		const rawBaseUrl = String(credentials.baseUrl ?? '').trim() || this.getInstanceBaseUrl();
+		const baseUrl = `${rawBaseUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')}/api/v1`;
 
 		const request = async (method: 'GET' | 'PUT', executionId: string, body?: TagRef[]) => {
 			const options: IHttpRequestOptions = {
