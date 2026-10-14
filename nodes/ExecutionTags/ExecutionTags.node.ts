@@ -16,7 +16,7 @@ import {
 
 type TagRef = { id: string; name?: string };
 
-type ErrorContext = { baseUrl: string; executionId: string; tagsBy: string };
+type ErrorContext = { baseUrl: string; executionId: string };
 
 // Turns raw API errors into messages a human can act on
 function explainError(error: unknown, ctx: ErrorContext): { message: string; description: string } | undefined {
@@ -42,21 +42,15 @@ function explainError(error: unknown, ctx: ErrorContext): { message: string; des
 		return {
 			message: 'The API key has no access to this action',
 			description:
-				'The key is valid but is missing a scope. Required: execution:list, executionTags:list, executionTags:update; for tags by name also tag:list and tag:create. Edit the key in Settings → n8n API.',
+				'The key is valid but is missing a scope. Required: execution:list, executionTags:list, executionTags:update. Edit the key in Settings → n8n API.',
 		};
 	}
 	if (/some tags not found/i.test(raw)) {
-		return ctx.tagsBy === 'names'
-			? {
-					message: 'n8n does not accept these tags as execution tags',
-					description:
-						'Tags created or found through the n8n /tags API are not execution (annotation) tags in your n8n, so they cannot be assigned. Create the tag in the n8n UI (open an execution and add a tag), run "Get Tags" on that execution to read its ID, and use "Tags By: IDs".',
-				}
-			: {
-					message: 'One or more tag IDs do not exist',
-					description:
-						'Use IDs of execution (annotation) tags, not names. To find an ID, run "Get Tags" on an execution that already has the tag.',
-				};
+		return {
+			message: 'One or more tag IDs do not exist',
+			description:
+				'Use IDs of execution (annotation) tags, not names. The public API cannot create such tags: create the tag in the n8n UI (open an execution and add a tag), then run "Get Tags" on that execution to read its ID.',
+		};
 	}
 	if (status === 404 || /could not be found|not found/i.test(raw)) {
 		return {
@@ -111,42 +105,13 @@ export class ExecutionTags implements INodeType {
 				description: 'Defaults to the current execution',
 			},
 			{
-				displayName: 'Tags By',
-				name: 'tagsBy',
-				type: 'options',
-				default: 'ids',
-				options: [
-					{ name: 'IDs', value: 'ids', description: 'Use execution tag IDs directly (recommended)' },
-					{ name: 'Names (Experimental)', value: 'names', description: 'Look tags up by name via the /tags API; works only if your n8n shares these tags with executions' },
-				],
-				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
-			},
-			{
-				displayName: 'Tag Names',
-				name: 'tagNames',
-				type: 'string',
-				default: '',
-				placeholder: 'API-123, nightly',
-				description:
-					'Comma-separated tag names. For "Set Tags" an empty value clears all tags.',
-				displayOptions: { show: { operation: ['add', 'set', 'remove'], tagsBy: ['names'] } },
-			},
-			{
-				displayName: 'Create Missing Tags',
-				name: 'createMissing',
-				type: 'boolean',
-				default: true,
-				description: 'Whether to create tags that do not exist yet (Add Tags and Set Tags only)',
-				displayOptions: { show: { operation: ['add', 'set'], tagsBy: ['names'] } },
-			},
-			{
 				displayName: 'Tag IDs',
 				name: 'tagIds',
 				type: 'string',
 				default: '',
 				placeholder: 'tagId1, tagId2',
 				description: 'Comma-separated tag IDs. For "Set Tags" an empty value clears all tags.',
-				displayOptions: { show: { operation: ['add', 'set', 'remove'], tagsBy: ['ids'] } },
+				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
 			},
 		],
 		usableAsTool: true,
@@ -196,7 +161,7 @@ export class ExecutionTags implements INodeType {
 		const baseUrl = `${rawBaseUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')}/api/v1`;
 
 		const api = async (
-			method: 'GET' | 'PUT' | 'POST',
+			method: 'GET' | 'PUT',
 			path: string,
 			body?: IDataObject | IDataObject[],
 			qs?: IDataObject,
@@ -221,42 +186,8 @@ export class ExecutionTags implements INodeType {
 				body as IDataObject[] | undefined,
 			)) as TagRef[];
 
-		// name -> id of all tags, loaded lazily once per run
-		let tagIdByName: Map<string, string> | undefined;
-		const loadTags = async () => {
-			if (tagIdByName) return tagIdByName;
-			tagIdByName = new Map();
-			let cursor: string | undefined;
-			do {
-				const page = (await api('GET', '/tags', undefined, {
-					limit: 250,
-					...(cursor ? { cursor } : {}),
-				})) as { data?: TagRef[]; nextCursor?: string | null };
-				for (const tag of page.data ?? []) {
-					if (tag.name !== undefined) tagIdByName.set(tag.name, tag.id);
-				}
-				cursor = page.nextCursor ?? undefined;
-			} while (cursor);
-			return tagIdByName;
-		};
-
-		const namesToIds = async (names: string[], createMissing: boolean) => {
-			const known = await loadTags();
-			const ids: string[] = [];
-			for (const name of names) {
-				let id = known.get(name);
-				if (id === undefined && createMissing) {
-					const created = (await api('POST', '/tags', { name })) as TagRef;
-					id = created.id;
-					known.set(name, id);
-				}
-				if (id !== undefined) ids.push(id);
-			}
-			return ids;
-		};
-
 		for (let i = 0; i < items.length; i++) {
-			const ctx: ErrorContext = { baseUrl, executionId: '', tagsBy: 'names' };
+			const ctx: ErrorContext = { baseUrl, executionId: '' };
 			try {
 				const operation = this.getNodeParameter('operation', i) as string;
 				const executionId = String(this.getNodeParameter('executionId', i)).trim();
@@ -264,25 +195,14 @@ export class ExecutionTags implements INodeType {
 					throw new NodeOperationError(this.getNode(), 'Execution ID is empty', { itemIndex: i });
 				}
 				ctx.executionId = executionId;
-				ctx.tagsBy = operation === 'get' ? '' : String(this.getNodeParameter('tagsBy', i, 'ids'));
 
-				const splitList = (value: string) =>
-					value
-						.split(',')
-						.map((v) => v.trim())
-						.filter(Boolean);
-
-				let requested: string[] = [];
-				if (operation !== 'get') {
-					if (this.getNodeParameter('tagsBy', i, 'ids') === 'names') {
-						const names = splitList(String(this.getNodeParameter('tagNames', i, '')));
-						const createMissing =
-							operation !== 'remove' && (this.getNodeParameter('createMissing', i, true) as boolean);
-						requested = await namesToIds(names, createMissing);
-					} else {
-						requested = splitList(String(this.getNodeParameter('tagIds', i, '')));
-					}
-				}
+				const requested =
+					operation === 'get'
+						? []
+						: String(this.getNodeParameter('tagIds', i, ''))
+								.split(',')
+								.map((v) => v.trim())
+								.filter(Boolean);
 
 				let tags: TagRef[];
 
