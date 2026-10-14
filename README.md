@@ -14,8 +14,8 @@ See the [community nodes guide](https://docs.n8n.io/integrations/community-nodes
 |--------------------|-------------------------------------------------------------|
 | Get Tags           | Returns current tags of the execution                       |
 | Set Tags (Replace) | Replaces the whole tag set (empty value clears tags)        |
-| Add Tags           | Reads current tags, merges the given IDs, writes the result |
-| Remove Tags        | Reads current tags, drops the given IDs, writes the result  |
+| Add Tags           | Reads current tags, merges the given tags, writes the result |
+| Remove Tags        | Reads current tags, drops the given tags, writes the result  |
 
 `Execution ID` defaults to `{{ $execution.id }}` (the current execution).
 
@@ -23,7 +23,7 @@ Tags can be given **by name** (default) or **by ID** (`Tags By`). With names the
 
 ## Credentials
 
-Create an **Execution Tags API** credential (same fields as the built-in n8n API credential):
+Create an **Execution Tags API** credential:
 
 - Base URL: optional. Leave empty to use the n8n instance the node runs on, or enter another instance URL, e.g. `https://your-n8n-host/api/v1` (`/api/v1` is appended automatically if missing). The credential test only checks the connection when the field is filled
 - API Key: create it in n8n under **Settings → n8n API**
@@ -44,8 +44,9 @@ npm run lint
 npm run build
 ```
 
-Releases are published from GitHub Actions with npm provenance: push a tag like `v0.1.0`
-(requires the `NPM_TOKEN` repository secret).
+Releases are published from GitHub Actions via npm Trusted Publishing (no token needed):
+bump `version` in `package.json`, then push a matching tag, e.g. `git tag v0.2.1 && git push origin v0.2.1`.
+The publisher (`publish.yml`) must be configured for the package on npmjs.com.
 
 ## License
 
