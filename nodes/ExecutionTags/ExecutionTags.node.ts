@@ -16,6 +16,64 @@ import {
 
 type TagRef = { id: string; name?: string };
 
+type ErrorContext = { baseUrl: string; executionId: string; tagsBy: string };
+
+// Turns raw API errors into messages a human can act on
+function explainError(error: unknown, ctx: ErrorContext): { message: string; description: string } | undefined {
+	const err = error as { message?: string; httpCode?: string | number; description?: string };
+	const raw = `${err.message ?? ''} ${err.description ?? ''}`;
+	const status = Number(err.httpCode ?? /status code (\d{3})/.exec(raw)?.[1] ?? 0);
+
+	if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|certificate/i.test(raw)) {
+		return {
+			message: `Cannot reach n8n at ${ctx.baseUrl}`,
+			description:
+				'Check the Base URL in the Execution Tags API credential (leave it empty to use this instance) and that n8n is reachable from here.',
+		};
+	}
+	if (status === 401) {
+		return {
+			message: 'The API key is not valid',
+			description:
+				'n8n rejected the API key. Sorry, the key in the Execution Tags API credential is wrong, expired or belongs to another instance. Create a new one in n8n under Settings → n8n API.',
+		};
+	}
+	if (status === 403) {
+		return {
+			message: 'The API key has no access to this action',
+			description:
+				'The key is valid but is missing a scope. Required: execution:list, executionTags:list, executionTags:update; for tags by name also tag:list and tag:create. Edit the key in Settings → n8n API.',
+		};
+	}
+	if (/some tags not found/i.test(raw)) {
+		return ctx.tagsBy === 'names'
+			? {
+					message: 'n8n does not accept these tags as execution tags',
+					description:
+						'Tags created or found through the n8n /tags API are not execution (annotation) tags in your n8n, so they cannot be assigned. Create the tag in the n8n UI (open an execution and add a tag), run "Get Tags" on that execution to read its ID, and use "Tags By: IDs".',
+				}
+			: {
+					message: 'One or more tag IDs do not exist',
+					description:
+						'Use IDs of execution (annotation) tags, not names. To find an ID, run "Get Tags" on an execution that already has the tag.',
+				};
+	}
+	if (status === 404 || /could not be found|not found/i.test(raw)) {
+		return {
+			message: `Not found: execution ${ctx.executionId} or the n8n public API at ${ctx.baseUrl}`,
+			description:
+				'Check the Execution ID and the Base URL (it should end with /api/v1), and that the public API is enabled on your n8n instance.',
+		};
+	}
+	if (status === 415) {
+		return {
+			message: 'n8n rejected the request format (415)',
+			description: 'The request was sent without a supported Content-Type. Please report this as a bug.',
+		};
+	}
+	return undefined;
+}
+
 export class ExecutionTags implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Execution Tags',
@@ -56,10 +114,10 @@ export class ExecutionTags implements INodeType {
 				displayName: 'Tags By',
 				name: 'tagsBy',
 				type: 'options',
-				default: 'names',
+				default: 'ids',
 				options: [
-					{ name: 'Names', value: 'names', description: 'Look tags up by name (missing ones can be created)' },
-					{ name: 'IDs', value: 'ids', description: 'Use tag IDs directly' },
+					{ name: 'IDs', value: 'ids', description: 'Use execution tag IDs directly (recommended)' },
+					{ name: 'Names (Experimental)', value: 'names', description: 'Look tags up by name via the /tags API; works only if your n8n shares these tags with executions' },
 				],
 				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
 			},
@@ -198,12 +256,15 @@ export class ExecutionTags implements INodeType {
 		};
 
 		for (let i = 0; i < items.length; i++) {
+			const ctx: ErrorContext = { baseUrl, executionId: '', tagsBy: 'names' };
 			try {
 				const operation = this.getNodeParameter('operation', i) as string;
 				const executionId = String(this.getNodeParameter('executionId', i)).trim();
 				if (!executionId) {
 					throw new NodeOperationError(this.getNode(), 'Execution ID is empty', { itemIndex: i });
 				}
+				ctx.executionId = executionId;
+				ctx.tagsBy = operation === 'get' ? '' : String(this.getNodeParameter('tagsBy', i, 'ids'));
 
 				const splitList = (value: string) =>
 					value
@@ -213,7 +274,7 @@ export class ExecutionTags implements INodeType {
 
 				let requested: string[] = [];
 				if (operation !== 'get') {
-					if (this.getNodeParameter('tagsBy', i, 'names') === 'names') {
+					if (this.getNodeParameter('tagsBy', i, 'ids') === 'names') {
 						const names = splitList(String(this.getNodeParameter('tagNames', i, '')));
 						const createMissing =
 							operation !== 'remove' && (this.getNodeParameter('createMissing', i, true) as boolean);
@@ -245,14 +306,21 @@ export class ExecutionTags implements INodeType {
 					pairedItem: { item: i },
 				});
 			} catch (error) {
+				const friendly = explainError(error, ctx);
 				if (this.continueOnFail()) {
 					returnData.push({
-						json: { error: (error as Error).message },
+						json: { error: friendly?.message ?? (error as Error).message, hint: friendly?.description },
 						pairedItem: { item: i },
 					});
 					continue;
 				}
-				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
+				if (error instanceof NodeOperationError) {
+					throw new NodeOperationError(this.getNode(), error, { itemIndex: i });
+				}
+				throw new NodeApiError(this.getNode(), error as JsonObject, {
+					itemIndex: i,
+					...(friendly ?? {}),
+				});
 			}
 		}
 

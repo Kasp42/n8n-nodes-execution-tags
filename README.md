@@ -19,7 +19,7 @@ See the [community nodes guide](https://docs.n8n.io/integrations/community-nodes
 
 `Execution ID` defaults to `{{ $execution.id }}` (the current execution).
 
-Tags can be given **by name** (default) or **by ID** (`Tags By`). With names the node looks tags up via `GET /tags` and, for Add/Set, creates missing ones via `POST /tags` (`Create Missing Tags`), then assigns them. Remove never creates tags.
+Tags are given **by ID** (`Tags By: IDs`, default). *Names (Experimental)* looks tags up via `GET /tags` and, for Add/Set, creates missing ones via `POST /tags`. In tested n8n versions these `/tags` are not execution tags, so assigning them fails ("Some tags not found"); use IDs unless your instance shares them.
 
 ## Credentials
 
@@ -31,7 +31,8 @@ Create an **Execution Tags API** credential:
 
 ## Notes and limitations
 
-- The execution tags endpoint takes tag IDs; by-name mode resolves names through the n8n `/tags` API. If assigning a tag fails with "Some tags not found", your n8n keeps execution tags separately from `/tags` - use `Tags By: IDs` with IDs from *Get Tags*.
+- The execution tags endpoint takes execution tag IDs only, and the public API cannot create such tags. Create the tag in the n8n UI (open an execution, add a tag), then read its ID with *Get Tags* on that execution.
+- Errors (bad key, missing scope, wrong URL, unknown tag) are reported with a plain-language explanation.
 - Tagging an execution that is still running may not work on every n8n version. If it fails, call the node from a separate workflow after the main one finishes.
 - Add / Remove are read-modify-write; two parallel runs on the same execution can overwrite each other.
 

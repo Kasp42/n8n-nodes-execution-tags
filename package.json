@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-execution-tags",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "n8n community node to get, set, add and remove annotation tags of an execution via the n8n public API",
   "keywords": [
     "n8n-community-node-package",
