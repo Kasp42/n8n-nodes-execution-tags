@@ -53,14 +53,42 @@ export class ExecutionTags implements INodeType {
 				description: 'Defaults to the current execution',
 			},
 			{
+				displayName: 'Tags By',
+				name: 'tagsBy',
+				type: 'options',
+				default: 'names',
+				options: [
+					{ name: 'Names', value: 'names', description: 'Look tags up by name (missing ones can be created)' },
+					{ name: 'IDs', value: 'ids', description: 'Use tag IDs directly' },
+				],
+				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
+			},
+			{
+				displayName: 'Tag Names',
+				name: 'tagNames',
+				type: 'string',
+				default: '',
+				placeholder: 'API-123, nightly',
+				description:
+					'Comma-separated tag names. For "Set Tags" an empty value clears all tags.',
+				displayOptions: { show: { operation: ['add', 'set', 'remove'], tagsBy: ['names'] } },
+			},
+			{
+				displayName: 'Create Missing Tags',
+				name: 'createMissing',
+				type: 'boolean',
+				default: true,
+				description: 'Whether to create tags that do not exist yet (Add Tags and Set Tags only)',
+				displayOptions: { show: { operation: ['add', 'set'], tagsBy: ['names'] } },
+			},
+			{
 				displayName: 'Tag IDs',
 				name: 'tagIds',
 				type: 'string',
 				default: '',
 				placeholder: 'tagId1, tagId2',
-				description:
-					'Comma-separated IDs of execution annotation tags. For "Set Tags" an empty value clears all tags.',
-				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
+				description: 'Comma-separated tag IDs. For "Set Tags" an empty value clears all tags.',
+				displayOptions: { show: { operation: ['add', 'set', 'remove'], tagsBy: ['ids'] } },
 			},
 		],
 		usableAsTool: true,
@@ -109,18 +137,61 @@ export class ExecutionTags implements INodeType {
 		const rawBaseUrl = String(credentials.baseUrl ?? '').trim() || this.getInstanceBaseUrl();
 		const baseUrl = `${rawBaseUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')}/api/v1`;
 
-		const request = async (method: 'GET' | 'PUT', executionId: string, body?: TagRef[]) => {
-			const options: IHttpRequestOptions = {
-				method,
-				url: `${baseUrl}/executions/${encodeURIComponent(executionId)}/tags`,
-				json: true,
-			};
+		const api = async (
+			method: 'GET' | 'PUT' | 'POST',
+			path: string,
+			body?: IDataObject | IDataObject[],
+			qs?: IDataObject,
+		) => {
+			const options: IHttpRequestOptions = { method, url: `${baseUrl}${path}`, json: true };
 			if (body) options.body = body;
-			return (await this.helpers.httpRequestWithAuthentication.call(
+			if (qs) options.qs = qs;
+			return await this.helpers.httpRequestWithAuthentication.call(
 				this,
 				'executionTagsApi',
 				options,
+			);
+		};
+
+		const request = async (method: 'GET' | 'PUT', executionId: string, body?: TagRef[]) =>
+			(await api(
+				method,
+				`/executions/${encodeURIComponent(executionId)}/tags`,
+				body as IDataObject[] | undefined,
 			)) as TagRef[];
+
+		// name -> id of all tags, loaded lazily once per run
+		let tagIdByName: Map<string, string> | undefined;
+		const loadTags = async () => {
+			if (tagIdByName) return tagIdByName;
+			tagIdByName = new Map();
+			let cursor: string | undefined;
+			do {
+				const page = (await api('GET', '/tags', undefined, {
+					limit: 250,
+					...(cursor ? { cursor } : {}),
+				})) as { data?: TagRef[]; nextCursor?: string | null };
+				for (const tag of page.data ?? []) {
+					if (tag.name !== undefined) tagIdByName.set(tag.name, tag.id);
+				}
+				cursor = page.nextCursor ?? undefined;
+			} while (cursor);
+			return tagIdByName;
+		};
+
+		const namesToIds = async (names: string[], createMissing: boolean) => {
+			const known = await loadTags();
+			const ids: string[] = [];
+			for (const name of names) {
+				let id = known.get(name);
+				if (id === undefined && createMissing) {
+					const created = (await api('POST', '/tags', { name })) as TagRef;
+					id = created.id;
+					known.set(name, id);
+				}
+				if (id !== undefined) ids.push(id);
+			}
+			return ids;
 		};
 
 		for (let i = 0; i < items.length; i++) {
@@ -131,13 +202,23 @@ export class ExecutionTags implements INodeType {
 					throw new NodeOperationError(this.getNode(), 'Execution ID is empty', { itemIndex: i });
 				}
 
-				const requested =
-					operation === 'get'
-						? []
-						: String(this.getNodeParameter('tagIds', i, ''))
-								.split(',')
-								.map((s) => s.trim())
-								.filter(Boolean);
+				const splitList = (value: string) =>
+					value
+						.split(',')
+						.map((v) => v.trim())
+						.filter(Boolean);
+
+				let requested: string[] = [];
+				if (operation !== 'get') {
+					if (this.getNodeParameter('tagsBy', i, 'names') === 'names') {
+						const names = splitList(String(this.getNodeParameter('tagNames', i, '')));
+						const createMissing =
+							operation !== 'remove' && (this.getNodeParameter('createMissing', i, true) as boolean);
+						requested = await namesToIds(names, createMissing);
+					} else {
+						requested = splitList(String(this.getNodeParameter('tagIds', i, '')));
+					}
+				}
 
 				let tags: TagRef[];
 

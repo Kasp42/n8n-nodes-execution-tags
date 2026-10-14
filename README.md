@@ -19,17 +19,19 @@ See the [community nodes guide](https://docs.n8n.io/integrations/community-nodes
 
 `Execution ID` defaults to `{{ $execution.id }}` (the current execution).
 
+Tags can be given **by name** (default) or **by ID** (`Tags By`). With names the node looks tags up via `GET /tags` and, for Add/Set, creates missing ones via `POST /tags` (`Create Missing Tags`), then assigns them. Remove never creates tags.
+
 ## Credentials
 
 Create an **Execution Tags API** credential (same fields as the built-in n8n API credential):
 
 - Base URL: optional. Leave empty to use the n8n instance the node runs on, or enter another instance URL, e.g. `https://your-n8n-host/api/v1` (`/api/v1` is appended automatically if missing). The credential test only checks the connection when the field is filled
 - API Key: create it in n8n under **Settings → n8n API**
-- The API key needs the scopes `execution:list` (used by the credential test), `executionTags:list` and `executionTags:update`.
+- API key scopes: `execution:list` (credential test), `tag:list` and `tag:create` (tags by name), plus the scope your n8n version requires to read/update executions. If n8n answers 403 Forbidden, a scope is missing.
 
 ## Notes and limitations
 
-- The API expects **annotation tag IDs**. Find an ID by running *Get Tags* on an execution that already has the tag.
+- The execution tags endpoint takes tag IDs; by-name mode resolves names through the n8n `/tags` API. If assigning a tag fails with "Some tags not found", your n8n keeps execution tags separately from `/tags` - use `Tags By: IDs` with IDs from *Get Tags*.
 - Tagging an execution that is still running may not work on every n8n version. If it fails, call the node from a separate workflow after the main one finishes.
 - Add / Remove are read-modify-write; two parallel runs on the same execution can overwrite each other.
 
