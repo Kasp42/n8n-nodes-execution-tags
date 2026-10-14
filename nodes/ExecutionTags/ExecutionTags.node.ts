@@ -68,7 +68,9 @@ export class ExecutionTags implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 
 		const credentials = await this.getCredentials('executionTagsApi');
-		const baseUrl = String(credentials.baseUrl).replace(/\/+$/, '');
+		const baseUrl = `${String(credentials.baseUrl)
+			.replace(/\/+$/, '')
+			.replace(/\/api\/v1$/, '')}/api/v1`;
 
 		const request = async (method: 'GET' | 'PUT', executionId: string, body?: TagRef[]) => {
 			const options: IHttpRequestOptions = {

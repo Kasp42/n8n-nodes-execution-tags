@@ -16,6 +16,13 @@ export class ExecutionTagsApi implements ICredentialType {
 
 	properties: INodeProperties[] = [
 		{
+			displayName:
+				'Create the key in your n8n instance: <b>Settings → n8n API</b>. The key needs the scopes <code>execution:list</code>, <code>executionTags:list</code> and <code>executionTags:update</code>. <a href="https://docs.n8n.io/api/authentication/" target="_blank">Docs</a>',
+			name: 'notice',
+			type: 'notice',
+			default: '',
+		},
+		{
 			displayName: 'API Key',
 			name: 'apiKey',
 			type: 'string',
@@ -26,8 +33,10 @@ export class ExecutionTagsApi implements ICredentialType {
 			displayName: 'Base URL',
 			name: 'baseUrl',
 			type: 'string',
-			default: 'https://<your-n8n-host>/api/v1',
-			description: 'Base URL of the n8n public API (must end with /api/v1)',
+			default: 'http://localhost:5678/api/v1',
+			placeholder: 'https://your-n8n-host/api/v1',
+			description:
+				'URL of your n8n instance. "/api/v1" is appended automatically if it is missing.',
 		},
 	];
 
@@ -40,7 +49,8 @@ export class ExecutionTagsApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials.baseUrl}}',
+			baseURL:
+				"={{$credentials.baseUrl.replace(/\\/+$/, '').replace(/\\/api\\/v1$/, '') + '/api/v1'}}",
 			url: '/executions',
 			qs: { limit: 1 },
 		},

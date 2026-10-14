@@ -23,9 +23,9 @@ See the [community nodes guide](https://docs.n8n.io/integrations/community-nodes
 
 Create an **Execution Tags API** credential (same fields as the built-in n8n API credential):
 
-- Base URL: `https://<your-host>/api/v1`
-- API Key: an n8n API key
-- The API key needs the scopes `executionTags:list` and `executionTags:update`.
+- Base URL: your n8n instance URL, e.g. `https://your-n8n-host/api/v1` (`/api/v1` is appended automatically if missing)
+- API Key: create it in n8n under **Settings → n8n API**
+- The API key needs the scopes `execution:list` (used by the credential test), `executionTags:list` and `executionTags:update`.
 
 ## Notes and limitations
 
