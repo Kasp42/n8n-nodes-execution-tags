@@ -16,7 +16,7 @@ export class ExecutionTagsApi implements ICredentialType {
 	properties: INodeProperties[] = [
 		{
 			displayName:
-				'Create the key in your n8n instance: <b>Settings → n8n API</b>. The key needs the scopes <code>execution:list</code> (credential test), <code>tag:list</code> and <code>tag:create</code> (tags by name) plus the scope your n8n requires to update executions. <a href="https://docs.n8n.io/api/authentication/" target="_blank">Docs</a>',
+				'Create the key in your n8n instance: <b>Settings → n8n API</b>. The key needs the scopes <code>execution:list</code> (credential test), <code>executionTags:list</code> and <code>executionTags:update</code> (execution tags), <code>tag:list</code> and <code>tag:create</code> (tags by name). <a href="https://docs.n8n.io/api/authentication/" target="_blank">Docs</a>',
 			name: 'notice',
 			type: 'notice',
 			default: '',

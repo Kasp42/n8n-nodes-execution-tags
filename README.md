@@ -27,7 +27,7 @@ Create an **Execution Tags API** credential:
 
 - Base URL: optional. Leave empty to use the n8n instance the node runs on, or enter another instance URL, e.g. `https://your-n8n-host/api/v1` (`/api/v1` is appended automatically if missing). The credential test only checks the connection when the field is filled
 - API Key: create it in n8n under **Settings → n8n API**
-- API key scopes: `execution:list` (credential test), `tag:list` and `tag:create` (tags by name), plus the scope your n8n version requires to read/update executions. If n8n answers 403 Forbidden, a scope is missing.
+- API key scopes: `execution:list` (credential test), `executionTags:list` and `executionTags:update` (read/change execution tags), `tag:list` and `tag:create` (tags by name). If n8n answers 403 Forbidden, a scope is missing.
 
 ## Notes and limitations
 
