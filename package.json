@@ -9,14 +9,14 @@
     "tags"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/<your-github>/n8n-nodes-execution-tags",
+  "homepage": "https://github.com/Kasp42/n8n-nodes-execution-tags",
   "author": {
-    "name": "<your name>",
-    "email": "<your email>"
+    "name": "Kasp42",
+    "email": "42@kasp.dev"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-github>/n8n-nodes-execution-tags.git"
+    "url": "git+https://github.com/Kasp42/n8n-nodes-execution-tags.git"
   },
   "scripts": {
     "build": "n8n-node build",
