@@ -10,5 +10,5 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["nodes/**/*.ts"]
+  "include": ["nodes/**/*.ts", "credentials/**/*.ts"]
 }

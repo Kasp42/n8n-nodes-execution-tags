@@ -23,8 +23,8 @@ export class ExecutionTags implements INodeType {
 		defaults: { name: 'Execution Tags' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
-		// Reuses the built-in "n8n API" credential (Base URL must end with /api/v1)
-		credentials: [{ name: 'n8nApi', required: true }],
+		// Own credential: n8n public API key + Base URL (must end with /api/v1)
+		credentials: [{ name: 'executionTagsApi', required: true }],
 		properties: [
 			{
 				displayName: 'Operation',
@@ -58,13 +58,14 @@ export class ExecutionTags implements INodeType {
 				displayOptions: { show: { operation: ['add', 'set', 'remove'] } },
 			},
 		],
+		usableAsTool: true,
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
-		const credentials = await this.getCredentials('n8nApi');
+		const credentials = await this.getCredentials('executionTagsApi');
 		const baseUrl = String(credentials.baseUrl).replace(/\/+$/, '');
 
 		const request = async (method: 'GET' | 'PUT', executionId: string, body?: TagRef[]) => {
@@ -76,7 +77,7 @@ export class ExecutionTags implements INodeType {
 			if (body) options.body = body;
 			return (await this.helpers.httpRequestWithAuthentication.call(
 				this,
-				'n8nApi',
+				'executionTagsApi',
 				options,
 			)) as TagRef[];
 		};

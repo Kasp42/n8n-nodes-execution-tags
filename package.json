@@ -33,15 +33,18 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "strict": true,
-    "credentials": [],
+    "credentials": [
+      "dist/credentials/ExecutionTagsApi.credentials.js"
+    ],
     "nodes": [
       "dist/nodes/ExecutionTags/ExecutionTags.node.js"
     ]
   },
   "devDependencies": {
     "@n8n/node-cli": "^0.23.0",
-    "typescript": "^5.4.0",
-    "n8n-workflow": "*"
+    "eslint": "^9.39.5",
+    "n8n-workflow": "*",
+    "typescript": "^5.4.0"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
