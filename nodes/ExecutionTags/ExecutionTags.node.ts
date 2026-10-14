@@ -2,9 +2,11 @@ import {
 	IDataObject,
 	IExecuteFunctions,
 	IHttpRequestOptions,
+	JsonObject,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
 	NodeConnectionTypes,
 	NodeOperationError,
 } from 'n8n-workflow';
@@ -15,7 +17,7 @@ export class ExecutionTags implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Execution Tags',
 		name: 'executionTags',
-		icon: 'file:executionTags.svg',
+		icon: { light: 'file:executionTags.svg', dark: 'file:executionTags.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
@@ -127,7 +129,7 @@ export class ExecutionTags implements INodeType {
 					});
 					continue;
 				}
-				throw error;
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 			}
 		}
 
