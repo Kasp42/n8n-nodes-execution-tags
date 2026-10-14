@@ -144,7 +144,10 @@ export class ExecutionTags implements INodeType {
 			qs?: IDataObject,
 		) => {
 			const options: IHttpRequestOptions = { method, url: `${baseUrl}${path}`, json: true };
-			if (body) options.body = body;
+			if (body) {
+				options.body = body;
+				options.headers = { 'Content-Type': 'application/json' };
+			}
 			if (qs) options.qs = qs;
 			return await this.helpers.httpRequestWithAuthentication.call(
 				this,
